@@ -1,3 +1,4 @@
+import os
 from core.http.navigator import Browser
 
 URL_BASE = "https://ava3.cefor.ifes.edu.br/"
@@ -13,9 +14,9 @@ class AvaClientApi(Browser):
         self.course_link = None
         self.set_headers()
         self.headers = self.get_headers()
-        self.get_token()
 
     def get_token(self):
+        print("Gerando nova sessão...")
         self.response = self.send_request(
             "GET",
             f"{URL_BASE}/login/index.php",
@@ -26,24 +27,39 @@ class AvaClientApi(Browser):
 
     def auth(self):
         result_status = False
-        payload = {
-            "anchor": "",
-            "username": self.username,
-            "password": self.password,
-            "logintoken": self.token,
-            "rememberusername": "1"
-        }
-        self.headers["referer"] = URL_BASE
-        self.response = self.send_request(
-            "POST",
-            f"{URL_BASE}/login/index.php",
-            data=payload,
-            headers=self.headers
-        )
+        if not os.path.exists("./session.json"):
+            self.get_token()
+            payload = {
+                "anchor": "",
+                "username": self.username,
+                "password": self.password,
+                "logintoken": self.token,
+                "rememberusername": "1"
+            }
+            self.headers["referer"] = URL_BASE
+            self.response = self.send_request(
+                "POST",
+                f"{URL_BASE}/login/index.php",
+                data=payload,
+                headers=self.headers
+            )
+            self.save_cookies()
+        else:
+            self.headers["referer"] = URL_BASE
+            self.response = self.send_request(
+                "POST",
+                f"{URL_BASE}/my",
+                headers=self.headers
+            )
         message = self.get_soup().find("div", {"class": "logininfo"}).get_text()
         if "Sair" in message:
             message = message.replace("(Sair)", "")
             result_status = True
+        else:
+            if os.path.exists("./session.json"):
+                os.remove("./session.json")
+                print("Sessão expirada, efetuando login novamente...")
+                self.auth()
         return result_status, message
 
     def get_courses(self):

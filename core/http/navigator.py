@@ -1,6 +1,9 @@
+import json
+import os.path
 import tempfile
 import requests
 import webbrowser
+from pathlib import Path
 from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -44,6 +47,14 @@ class Browser(object):
     def get_headers(self):
         return self.headers
 
+    def save_cookies(self):
+        cookie_string = self.session.cookies
+        output_file = Path("./session.json")
+        output_file.parent.mkdir(exist_ok=True, parents=True)
+        output_file.write_text(
+            json.dumps(requests.utils.dict_from_cookiejar(cookie_string))
+        )
+
     def get_soup(self):
         return BeautifulSoup(self.response.content, "html.parser")
 
@@ -53,6 +64,11 @@ class Browser(object):
         webbrowser.open_new_tab(f"file://{file.name}")
 
     def send_request(self, method, url, **kwargs):
+        if os.path.exists("./session.json"):
+            with open("./session.json", "r") as session:
+                cookie_dict = json.loads(session.read())
+                cookies = requests.utils.cookiejar_from_dict(cookie_dict)
+                self.session.cookies.update(cookies)
         try:
             self.session.mount("https://", adapter)
             self.session.mount("http://", adapter)
